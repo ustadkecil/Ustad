@@ -1,4 +1,3 @@
-
 name: Build Android APK
 on: [push, workflow_dispatch]
 jobs:
@@ -9,6 +8,15 @@ jobs:
       - name: Ekstrak ZIP
         run: |
           for f in *.zip; do unzip -o "$f"; done
+      - name: Tambah Channel Suara Adzan Android 8+
+        run: |
+          python3 -c "
+          p='www/index.html'; s=open(p).read()
+          s=s.replace(\"sound: 'adzan.mp3'\", \"channelId: 'adzan_channel_v2', sound: 'adzan.mp3'\", 1)
+          ch=\"await LN.createChannel({ id: 'adzan_channel_v2', name: 'Adzan Waktu Sholat', description: 'Suara Adzan 5 Waktu Sholat', importance: 5, visibility: 1, sound: 'adzan.mp3', vibration: true });\n        \"
+          s=s.replace('await LN.cancel(', ch + 'await LN.cancel(', 1)
+          open(p,'w').write(s)
+          "
       - uses: actions/setup-node@v4
         with:
           node-version: 20
@@ -16,10 +24,12 @@ jobs:
         with:
           distribution: temurin
           java-version: 17
-      - name: Setup Capacitor Android
+      - name: Setup Capacitor Android & Unduh Audio Adzan
         run: |
           npm install
           npx cap add android
+          mkdir -p android/app/src/main/res/raw
+          curl -L -f "https://cdn.aladhan.com/audio/adhans/a9.mp3" -o android/app/src/main/res/raw/adzan.mp3 || curl -L -f "https://cdn.aladhan.com/audio/adhans/a1.mp3" -o android/app/src/main/res/raw/adzan.mp3
           npx cap sync android
           MANIFEST="android/app/src/main/AndroidManifest.xml"
           sed -i '/<\/manifest>/i \    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />\n    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />\n    <uses-permission android:name="android.permission.RECORD_AUDIO" />\n    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />\n    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />' "$MANIFEST"
@@ -30,5 +40,6 @@ jobs:
           ./gradlew assembleDebug
       - uses: actions/upload-artifact@v4
         with:
-          name: Ngaji-Ustadz-Kecil-APK
+          name: Ngaji-Ustadz-Kecil-APK-Adzan
           path: android/app/build/outputs/apk/debug/app-debug.apk
+          
